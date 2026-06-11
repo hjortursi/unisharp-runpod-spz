@@ -29,15 +29,24 @@ RUN git clone --depth 1 https://github.com/Insta360-Research-Team/UniSHARP.git /
 
 WORKDIR /workspace/UniSHARP
 
-# Keep torch/torchvision aligned with the RunPod CUDA 12.8 base and the known-good bootstrap.
-RUN python -m pip install --no-cache-dir --force-reinstall --index-url https://download.pytorch.org/whl/cu128 \
-      torch==2.8.0 torchvision==0.23.0 torchaudio==2.8.0 \
-    && python -m pip install --no-cache-dir -r requirements.txt \
-    && python -m pip install --no-cache-dir wandb xformers==0.0.32.post2 \
-    && python - <<'PYCHK'
+# The base image is already torch 2.8 / CUDA 12.8. Do not reinstall torch: it is slow
+# and bloats the remote build. Install UniSHARP deps with torch packages filtered out.
+RUN python - <<'PYCHK'
 import torch, torchvision
+print('base torch', torch.__version__, 'cuda', torch.version.cuda)
+print('base torchvision', torchvision.__version__)
+assert torch.__version__.startswith('2.8.0'), torch.__version__
+assert torchvision.__version__.startswith('0.23.0'), torchvision.__version__
+PYCHK
+RUN grep -Ev '^(torch|torchvision|torchaudio)==|^triton' requirements.txt > /tmp/unisharp-requirements-no-torch.txt \
+    && python -m pip install --no-cache-dir -r /tmp/unisharp-requirements-no-torch.txt \
+    && python -m pip install --no-cache-dir --no-deps wandb xformers==0.0.32.post2 \
+    && python - <<'PYCHK'
+import torch, torchvision, gsplat, xformers
 print('torch', torch.__version__, 'cuda', torch.version.cuda)
 print('torchvision', torchvision.__version__)
+print('gsplat', gsplat.__version__ if hasattr(gsplat, '__version__') else 'ok')
+print('xformers', xformers.__version__)
 PYCHK
 
 RUN mkdir -p /workspace/models \
