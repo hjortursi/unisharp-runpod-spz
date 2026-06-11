@@ -1,0 +1,7 @@
+*
+!Dockerfile
+!handler.py
+!start.sh
+!.github/
+!.github/workflows/
+!.github/workflows/build-ghcr.yml
